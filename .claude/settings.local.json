@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild:*)",
+      "Bash(swift build:*)",
+      "Bash(rm:*)",
+      "Bash(find:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp:*)"
+    ],
+    "deny": []
+  }
+}
