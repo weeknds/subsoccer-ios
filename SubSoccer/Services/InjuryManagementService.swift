@@ -127,7 +127,7 @@ class InjuryManagementService: ObservableObject {
         let availablePlayers = totalPlayers - injuredPlayers
         
         let currentInjuries = players.filter { $0.isInjured }
-        let averageInjuryDuration = calculateAverageInjuryDuration(for: currentInjuries)
+        let averageInjuryDuration = calculateAverageInjuryDuration(for: Array(currentInjuries))
         
         return InjuryStatistics(
             totalPlayers: totalPlayers,
@@ -160,7 +160,7 @@ class InjuryManagementService: ObservableObject {
         let excludedIds = Set(excluding.compactMap { $0.id })
         
         return availablePlayers.filter { player in
-            guard !excludedIds.contains(player.id) else { return false }
+            guard let playerId = player.id, !excludedIds.contains(playerId) else { return false }
             return player.position == position
         }
     }

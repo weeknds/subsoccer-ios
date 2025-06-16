@@ -45,6 +45,11 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAuthView) {
             AuthenticationView()
         }
+        .onChange(of: supabaseService.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                showingAuthView = false
+            }
+        }
         .sheet(isPresented: $showingNotificationSettings) {
             NotificationSettingsView()
         }

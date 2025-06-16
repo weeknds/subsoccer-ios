@@ -13,8 +13,11 @@ class SupabaseService: ObservableObject {
     
     // Real Supabase client
     lazy var client: SupabaseClient = {
-        SupabaseClient(
-            supabaseURL: URL(string: supabaseUrl)!,
+        guard let url = URL(string: supabaseUrl) else {
+            fatalError("Invalid Supabase URL: \(supabaseUrl)")
+        }
+        return SupabaseClient(
+            supabaseURL: url,
             supabaseKey: supabaseKey
         )
     }()
@@ -35,8 +38,8 @@ class SupabaseService: ObservableObject {
     func checkAuthStatus() async {
         do {
             let session = try await client.auth.session
-            currentUser = session?.user
-            isAuthenticated = session != nil
+            currentUser = session.user
+            isAuthenticated = true
         } catch {
             currentUser = nil
             isAuthenticated = false
@@ -48,10 +51,9 @@ class SupabaseService: ObservableObject {
     @MainActor
     func signUpWithEmail(_ email: String, password: String) async throws {
         let response = try await client.auth.signUp(email: email, password: password)
-        if let user = response.user {
-            currentUser = user
-            isAuthenticated = true
-        }
+        let user = response.user
+        currentUser = user
+        isAuthenticated = true
     }
     
     @MainActor

@@ -1,0 +1,90 @@
+/* Main Navigation */
+"teams" = "Teams";
+"matches" = "Matches";
+"calendar" = "Calendar";
+"settings" = "Settings";
+
+/* Teams */
+"teams_title" = "Teams";
+"no_teams_yet" = "No Teams Yet";
+"no_teams_description" = "Create your first team to get started with managing players and matches";
+"add_team" = "Add Team";
+"edit_team" = "Edit Team";
+"delete_team" = "Delete Team";
+"team_name" = "Team Name";
+"enter_team_name" = "Enter team name";
+"new_team" = "New Team";
+"team_details" = "Team Details";
+"manage_players" = "Manage Players";
+"manage_players_description" = "Add, edit, and organize team players";
+"created" = "Created";
+"players_count" = "%d players";
+
+/* Players */
+"players_title" = "%@ Players";
+"no_players_yet" = "No Players Yet";
+"no_players_description" = "Add your first player to get started";
+"no_players_found" = "No Players Found";
+"search_adjustment" = "Try adjusting your search terms";
+"search_players_placeholder" = "Search players...";
+"add_player" = "Add Player";
+"edit_player" = "Edit Player";
+"delete_player" = "Delete Player";
+"new_player" = "New Player";
+"player_name" = "Player Name";
+"enter_player_name" = "Enter player name";
+"jersey_number" = "Jersey Number";
+"position" = "Position";
+"goalkeeper" = "Goalkeeper";
+"defender" = "Defender";
+"midfielder" = "Midfielder";
+"forward" = "Forward";
+"add_photo" = "Add Photo";
+"change_photo" = "Change Photo";
+"unnamed_player" = "Unnamed Player";
+"no_position" = "No Position";
+"player_details" = "Player Details";
+"unknown_player" = "Unknown Player";
+
+/* Positions Short */
+"position_gk" = "GK";
+"position_def" = "DEF";
+"position_mid" = "MID";
+"position_fwd" = "FWD";
+
+/* Statistics */
+"goals" = "Goals";
+"assists" = "Assists";
+"matches" = "Matches";
+"minutes" = "Minutes";
+"all_time" = "All Time";
+"last_month" = "Last Month";
+"last_week" = "Last Week";
+"recent_matches" = "Recent Matches";
+"no_matches_played" = "No matches played yet";
+
+/* Common Actions */
+"cancel" = "Cancel";
+"save" = "Save";
+"done" = "Done";
+"edit" = "Edit";
+"delete" = "Delete";
+"add" = "Add";
+"loading" = "Loading...";
+"loading_players" = "Loading players...";
+"loading_more" = "Loading more players...";
+
+/* Accessibility */
+"teams_tab_hint" = "Navigate to team management";
+"matches_tab_hint" = "Navigate to match management";
+"calendar_tab_hint" = "Navigate to training calendar";
+"settings_tab_hint" = "Navigate to app settings";
+"add_new_item" = "Add new item";
+"add_team_hint" = "Double tap to create a new team";
+"chevron_right" = "Show details";
+
+/* Error Messages */
+"error_deleting_team" = "Error deleting team";
+"error_deleting_player" = "Error deleting player";
+"error_saving_team" = "Error saving team";
+"error_saving_player" = "Error saving player";

@@ -545,7 +545,8 @@ struct FormationRecommendationCard: View {
                 
                 HStack {
                     ForEach(["GK", "DEF", "MID", "FWD"], id: \.self) { position in
-                        if let count = formation.positionRequirements[FieldPosition(rawValue: position)!] {
+                        if let fieldPosition = LineupFieldPosition(rawValue: position),
+                           let count = formation.positionRequirements[fieldPosition] {
                             Text("\(position): \(count)")
                                 .font(.caption2)
                                 .padding(.horizontal, 8)

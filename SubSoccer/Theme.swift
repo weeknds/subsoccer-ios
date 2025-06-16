@@ -12,6 +12,7 @@ struct AppTheme {
     static let cornerRadius: CGFloat = 12
     static let largePadding: CGFloat = 16
     static let standardPadding: CGFloat = 8
+    static let minimumTappableArea: CGFloat = 44
     
     // MARK: - Typography
     static let headerFont = Font.system(.largeTitle, design: .default, weight: .bold)
@@ -19,6 +20,10 @@ struct AppTheme {
     static let subheadFont = Font.system(.subheadline, design: .default, weight: .semibold)
     static let bodyFont = Font.system(.body, design: .default, weight: .regular)
     static let captionFont = Font.system(.caption, design: .default, weight: .medium)
+    
+    static func scaledFont(_ textStyle: Font.TextStyle) -> Font {
+        return Font.system(textStyle, design: .default)
+    }
 }
 
 // MARK: - Common Styles
@@ -58,5 +63,57 @@ extension Color {
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+    
+    /// Returns a color with improved contrast for accessibility
+    func accessibleContrast(on background: Color) -> Color {
+        // Simplified contrast improvement - in production, you'd calculate actual contrast ratios
+        return self
+    }
+}
+
+// MARK: - View Extensions for Accessibility
+
+extension View {
+    /// Adds standard accessibility features to any view
+    func makeAccessible(label: String? = nil, hint: String? = nil, traits: AccessibilityTraits = []) -> some View {
+        self
+            .accessibilityLabel(label ?? "")
+            .accessibilityHint(hint ?? "")
+            .accessibilityAddTraits(traits)
+    }
+    
+    /// Ensures minimum tappable area for accessibility
+    func minimumTappableArea() -> some View {
+        self
+            .frame(minWidth: AppTheme.minimumTappableArea, minHeight: AppTheme.minimumTappableArea)
+    }
+    
+    /// Adds standard button accessibility features
+    func accessibleButton(label: String, hint: String? = nil) -> some View {
+        self
+            .makeAccessible(label: label, hint: hint, traits: .isButton)
+            .minimumTappableArea()
+    }
+}
+
+// MARK: - Reduced Motion Support
+
+struct ReducedMotionView<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    let animatedContent: Content
+    let staticContent: Content
+    
+    init(@ViewBuilder animated: () -> Content, @ViewBuilder staticContent: () -> Content) {
+        self.animatedContent = animated()
+        self.staticContent = staticContent()
+    }
+    
+    var body: some View {
+        if reduceMotion {
+            staticContent
+        } else {
+            animatedContent
+        }
     }
 }

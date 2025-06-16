@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreData
 
-struct FieldPosition {
+struct FieldPosition: Equatable {
     let id = UUID()
     let position: CGPoint
     let name: String
@@ -11,6 +11,10 @@ struct FieldPosition {
         self.position = CGPoint(x: x, y: y)
         self.name = name
         self.isMainPosition = isMainPosition
+    }
+    
+    static func == (lhs: FieldPosition, rhs: FieldPosition) -> Bool {
+        return lhs.id == rhs.id
     }
 }
 
@@ -59,10 +63,21 @@ struct LiveMatchView: View {
     @State private var playerPlaytimes: [UUID: TimeInterval] = [:]
     @State private var playerGoals: [UUID: Int] = [:]
     @State private var playerAssists: [UUID: Int] = [:]
+    @State private var redCardedPlayers: Set<UUID> = []
+    @State private var yellowCardedPlayers: [UUID: Int] = [:]  // Player ID -> Number of yellow cards
     @State private var matchStarted = false
     @State private var showingGoalAssistSelector = false
     @State private var isSelectingGoal = true
     @State private var showingLineupSuggestions = false
+    @State private var selectedPlayerToSubstitute: Player?
+    @State private var selectedFieldPosition: FieldPosition?
+    @State private var substitutionsUsed: Int = 0
+    @State private var currentHalf: Int = 1
+    @State private var halfStartTime: TimeInterval = 0
+    @State private var showingRedCardSelector = false
+    @State private var showingYellowCardSelector = false
+    @State private var showingValidationAlert = false
+    @State private var validationMessage = ""
     
     private var players: [Player] {
         (match.team?.playersArray ?? []).sorted { $0.name ?? "" < $1.name ?? "" }
@@ -83,14 +98,16 @@ struct LiveMatchView: View {
                 headerView
                 
                 GeometryReader { geometry in
-                    VStack(spacing: 0) {
+                    VStack(spacing: 8) {
                         // Soccer field
                         soccerFieldView(in: geometry)
-                            .frame(height: geometry.size.height * 0.65)
+                            .frame(height: geometry.size.height * 0.58)
                         
                         // Substitute players and controls
-                        bottomControlsView
-                            .frame(height: geometry.size.height * 0.35)
+                        ScrollView {
+                            bottomControlsView
+                        }
+                        .frame(height: geometry.size.height * 0.42)
                     }
                 }
             }
@@ -112,6 +129,17 @@ struct LiveMatchView: View {
                 LineupSuggestionView(team: team)
             }
         }
+        .alert("Match Alert", isPresented: $showingValidationAlert) {
+            Button("OK") { }
+        } message: {
+            Text(validationMessage)
+        }
+        .sheet(isPresented: $showingRedCardSelector) {
+            redCardSelectorView
+        }
+        .sheet(isPresented: $showingYellowCardSelector) {
+            yellowCardSelectorView
+        }
     }
     
     private var headerView: some View {
@@ -129,9 +157,15 @@ struct LiveMatchView: View {
                     .font(AppTheme.subheadFont)
                     .foregroundColor(AppTheme.primaryText)
                 
-                Text("\(playersOnField.count) on field")
-                    .font(AppTheme.captionFont)
-                    .foregroundColor(AppTheme.secondaryText)
+                VStack(spacing: 0) {
+                    Text("\(playersOnField.count)/11 on field")
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(playersOnField.count == 11 ? AppTheme.accentColor : AppTheme.secondaryText)
+                    
+                    Text("Half \(currentHalf) • \(substitutionsUsed)/5 subs")
+                        .font(.caption2)
+                        .foregroundColor(AppTheme.secondaryText)
+                }
             }
             
             Spacer()
@@ -199,6 +233,9 @@ struct LiveMatchView: View {
                         x: fieldPosition.position.x * geometry.size.width,
                         y: fieldPosition.position.y * geometry.size.height
                     )
+                    .onTapGesture {
+                        handleFieldPositionTap(fieldPosition)
+                    }
             }
             
             // Players on field in their assigned positions
@@ -209,6 +246,9 @@ struct LiveMatchView: View {
                             x: position.position.x * geometry.size.width,
                             y: position.position.y * geometry.size.height
                         )
+                        .onTapGesture {
+                            handleFieldPlayerTap(player)
+                        }
                 }
             }
         }
@@ -268,38 +308,80 @@ struct LiveMatchView: View {
     }
     
     private func playerTokenView(player: Player, isOnField: Bool) -> some View {
-        ZStack {
+        let playerID = player.id ?? UUID()
+        let isRedCarded = redCardedPlayers.contains(playerID)
+        let yellowCards = yellowCardedPlayers[playerID, default: 0]
+        let hasYellowCard = yellowCards > 0
+        
+        return ZStack {
             Circle()
-                .fill(isOnField ? AppTheme.accentColor : AppTheme.secondaryBackground)
+                .fill(isRedCarded ? Color.red : (isOnField ? AppTheme.accentColor : AppTheme.secondaryBackground))
                 .frame(width: 44, height: 44)
                 .overlay(
                     Circle()
-                        .stroke(Color.white, lineWidth: 2)
+                        .stroke(hasYellowCard && !isRedCarded ? Color.yellow : Color.white, lineWidth: hasYellowCard && !isRedCarded ? 3 : 2)
                 )
             
-            
-            Text("\(player.jerseyNumber)")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(isOnField ? .black : AppTheme.primaryText)
+            if isRedCarded {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+            } else {
+                VStack(spacing: 0) {
+                    Text("\(player.jerseyNumber)")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(isOnField ? .black : AppTheme.primaryText)
+                    
+                    if yellowCards > 0 {
+                        HStack(spacing: 1) {
+                            ForEach(0..<min(yellowCards, 2), id: \.self) { _ in
+                                Rectangle()
+                                    .fill(Color.yellow)
+                                    .frame(width: 3, height: 3)
+                            }
+                        }
+                        .offset(y: -2)
+                    }
+                }
+            }
         }
         .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+        .opacity(isRedCarded ? 0.7 : 1.0)
     }
     
     private var bottomControlsView: some View {
         VStack(spacing: 16) {
-            // Goal and Assist tracking buttons
-            HStack(spacing: 16) {
-                actionButton(
-                    title: "Goal",
-                    icon: "soccer.ball",
-                    action: { showGoalAssistSelector(isGoal: true) }
-                )
+            // Goal, Assist, and Card tracking buttons
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    actionButton(
+                        title: "Goal",
+                        icon: "soccerball",
+                        action: { showGoalAssistSelector(isGoal: true) }
+                    )
+                    
+                    actionButton(
+                        title: "Assist",
+                        icon: "hand.thumbsup",
+                        action: { showGoalAssistSelector(isGoal: false) }
+                    )
+                }
                 
-                actionButton(
-                    title: "Assist",
-                    icon: "hand.thumbsup",
-                    action: { showGoalAssistSelector(isGoal: false) }
-                )
+                HStack(spacing: 12) {
+                    actionButton(
+                        title: "Yellow Card",
+                        icon: "rectangle.fill",
+                        action: { showingYellowCardSelector = true },
+                        color: .yellow
+                    )
+                    
+                    actionButton(
+                        title: "Red Card",
+                        icon: "rectangle.fill",
+                        action: { showingRedCardSelector = true },
+                        color: .red
+                    )
+                }
             }
             
             // Substitute players section
@@ -310,27 +392,34 @@ struct LiveMatchView: View {
     }
     
     private func positionSpotView(fieldPosition: FieldPosition) -> some View {
-        ZStack {
+        let isOccupied = playersOnField.contains { player in
+            playerPositions[player.id ?? UUID()] == fieldPosition
+        }
+        let isSelected = selectedFieldPosition == fieldPosition
+        
+        return ZStack {
             Circle()
-                .fill(Color.white.opacity(0.3))
+                .fill(isOccupied ? Color.clear : (isSelected ? AppTheme.accentColor.opacity(0.5) : Color.white.opacity(0.3)))
                 .frame(width: 20, height: 20)
                 .overlay(
                     Circle()
-                        .stroke(Color.white, lineWidth: 1)
+                        .stroke(isSelected ? AppTheme.accentColor : Color.white, lineWidth: isSelected ? 2 : 1)
                 )
             
-            Text(fieldPosition.name)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(.white)
+            if !isOccupied {
+                Text(fieldPosition.name)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(isSelected ? .black : .white)
+            }
         }
     }
     
-    private func actionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func actionButton(title: String, icon: String, action: @escaping () -> Void, color: Color = AppTheme.accentColor) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(AppTheme.accentColor)
+                    .foregroundColor(color)
                 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
@@ -345,7 +434,7 @@ struct LiveMatchView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.accentColor.opacity(0.2), lineWidth: 1)
+                    .stroke(color.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -363,8 +452,13 @@ struct LiveMatchView: View {
                         VStack(spacing: 8) {
                             playerTokenView(player: player, isOnField: false)
                                 .onTapGesture {
-                                    handleSubstitutePlayerTap(player)
+                                    handleSubstitutePlayerSelection(player)
                                 }
+                                .background(
+                                    Circle()
+                                        .stroke(selectedPlayerToSubstitute == player ? AppTheme.accentColor : Color.clear, lineWidth: 3)
+                                        .frame(width: 50, height: 50)
+                                )
                             
                             VStack(spacing: 2) {
                                 Text(player.name ?? "Unknown")
@@ -374,7 +468,7 @@ struct LiveMatchView: View {
                                 
                                 HStack(spacing: 8) {
                                     HStack(spacing: 2) {
-                                        Image(systemName: "soccer.ball")
+                                        Image(systemName: "soccerball")
                                             .font(.caption2)
                                         Text("\(playerGoals[player.id ?? UUID(), default: 0])")
                                             .font(.caption2)
@@ -510,11 +604,65 @@ struct LiveMatchView: View {
     // MARK: - Timer Functions
     
     private func startTimer() {
+        // Validate match can start
+        guard validateMatchStart() else { return }
+        
         isRunning = true
         matchStarted = true
+        
+        // Set half start time if this is the beginning of a half
+        if elapsedTime == 0 || isStartOfNewHalf() {
+            halfStartTime = elapsedTime
+        }
+        
         matchTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             elapsedTime += 1
             updatePlayerPlaytimes()
+            checkHalfTime()
+        }
+    }
+    
+    private func validateMatchStart() -> Bool {
+        // Must have at least 7 players on field
+        guard playersOnField.count >= 7 else {
+            showValidationError("Need at least 7 players on field to start match")
+            return false
+        }
+        
+        // Ideally should have 11 players
+        if playersOnField.count < 11 {
+            showValidationError("Warning: Starting with only \(playersOnField.count) players. Ideal is 11.")
+        }
+        
+        return true
+    }
+    
+    private func isStartOfNewHalf() -> Bool {
+        let matchDuration = Double(match.duration * 60) // Convert to seconds
+        let halfDuration = matchDuration / Double(match.numberOfHalves)
+        let currentHalfTime = elapsedTime - halfStartTime
+        return currentHalfTime >= halfDuration
+    }
+    
+    private func checkHalfTime() {
+        let matchDuration = Double(match.duration * 60) // Convert to seconds
+        let halfDuration = matchDuration / Double(match.numberOfHalves)
+        let currentHalfTime = elapsedTime - halfStartTime
+        
+        // Check if half is complete
+        if currentHalfTime >= halfDuration && currentHalf < match.numberOfHalves {
+            pauseTimer()
+            currentHalf += 1
+            halfStartTime = elapsedTime
+            
+            // Show half-time notification
+            showValidationError("Half \(currentHalf - 1) completed. Ready for Half \(currentHalf)")
+        }
+        
+        // Check if match is complete
+        if currentHalf > match.numberOfHalves {
+            resetTimer()
+            showValidationError("Match completed!")
         }
     }
     
@@ -541,7 +689,9 @@ struct LiveMatchView: View {
     // MARK: - Match Setup
     
     private func setupInitialLineup() {
-        let allPlayers = Array(players)
+        let allPlayers = Array(players.filter { player in
+            !redCardedPlayers.contains(player.id ?? UUID())
+        })
         
         // Put first 11 players on field (or all if less than 11)
         let maxOnField = min(11, allPlayers.count)
@@ -553,6 +703,11 @@ struct LiveMatchView: View {
         
         // Initialize player statistics
         initializePlayerStats()
+        
+        // Reset match state
+        substitutionsUsed = 0
+        currentHalf = 1
+        halfStartTime = 0
     }
     
     private func assignPlayerPositions() {
@@ -568,6 +723,9 @@ struct LiveMatchView: View {
     // MARK: - Substitution Logic
     
     private func executeSubstitution(playerOut: Player, playerIn: Player) {
+        // Validate substitution rules
+        guard validateSubstitution(playerOut: playerOut, playerIn: playerIn) else { return }
+        
         // Transfer position from outgoing to incoming player
         if let playerOutID = playerOut.id,
            let playerInID = playerIn.id,
@@ -596,16 +754,312 @@ struct LiveMatchView: View {
             minute: Int(elapsedTime / 60)
         )
         substitutionHistory.append(event)
+        substitutionsUsed += 1
+        
+        // Clear selection
+        selectedPlayerToSubstitute = nil
+        selectedFieldPosition = nil
         
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
     }
     
-    private func handleSubstitutePlayerTap(_ player: Player) {
-        // Quick substitution with random field player
-        guard let randomFieldPlayer = playersOnField.randomElement() else { return }
-        executeSubstitution(playerOut: randomFieldPlayer, playerIn: player)
+    private func handleSubstitutePlayerSelection(_ player: Player) {
+        // Validate player is eligible for substitution
+        guard !redCardedPlayers.contains(player.id ?? UUID()) else {
+            showValidationError("Player is sent off and cannot be substituted")
+            return
+        }
+        
+        selectedPlayerToSubstitute = player
+        selectedFieldPosition = nil
+    }
+    
+    private func handleFieldPlayerTap(_ player: Player) {
+        // If we have a substitute selected, execute substitution
+        if let substitute = selectedPlayerToSubstitute {
+            executeSubstitution(playerOut: player, playerIn: substitute)
+        }
+    }
+    
+    private func handleFieldPositionTap(_ position: FieldPosition) {
+        // Only allow tapping empty positions
+        let isOccupied = playersOnField.contains { player in
+            playerPositions[player.id ?? UUID()] == position
+        }
+        
+        guard !isOccupied else { return }
+        
+        if let substitute = selectedPlayerToSubstitute {
+            // Move substitute to selected position
+            movePlayerToPosition(substitute, to: position)
+        } else {
+            selectedFieldPosition = position
+        }
+    }
+    
+    private func movePlayerToPosition(_ player: Player, to position: FieldPosition) {
+        guard let playerID = player.id else { return }
+        
+        // Validate we can add player to field
+        guard validatePlayerAddition(player) else { return }
+        
+        // Remove from bench, add to field
+        if let inIndex = playersOnBench.firstIndex(of: player) {
+            playersOnBench.remove(at: inIndex)
+        }
+        playersOnField.append(player)
+        playerPositions[playerID] = position
+        
+        // Clear selection
+        selectedPlayerToSubstitute = nil
+        selectedFieldPosition = nil
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
+    
+    private func validateSubstitution(playerOut: Player, playerIn: Player) -> Bool {
+        // Check substitution limit (5 per match)
+        guard substitutionsUsed < 5 else {
+            showValidationError("Maximum 5 substitutions allowed per match")
+            return false
+        }
+        
+        // Check if player being substituted in is red carded
+        guard !redCardedPlayers.contains(playerIn.id ?? UUID()) else {
+            showValidationError("Cannot substitute red-carded player")
+            return false
+        }
+        
+        // Check if player is already on field
+        guard !playersOnField.contains(playerIn) else {
+            showValidationError("Player is already on the field")
+            return false
+        }
+        
+        return true
+    }
+    
+    private func validatePlayerAddition(_ player: Player) -> Bool {
+        // Check if field is full (11 players max)
+        guard playersOnField.count < 11 else {
+            showValidationError("Field is full (11 players maximum)")
+            return false
+        }
+        
+        // Check if player is red carded
+        guard !redCardedPlayers.contains(player.id ?? UUID()) else {
+            showValidationError("Cannot add red-carded player to field")
+            return false
+        }
+        
+        return true
+    }
+    
+    private func validateMatchCanContinue() -> Bool {
+        // Match cannot continue with fewer than 7 players
+        let availablePlayers = playersOnField.count
+        return availablePlayers >= 7
+    }
+    
+    private func showValidationError(_ message: String) {
+        validationMessage = message
+        showingValidationAlert = true
+        
+        // Haptic feedback for error
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+    }
+    
+    // MARK: - Red Card System
+    
+    private func giveRedCard(to player: Player) {
+        guard let playerID = player.id else { return }
+        
+        // Add to red carded players
+        redCardedPlayers.insert(playerID)
+        
+        // Remove from field if on field
+        if let fieldIndex = playersOnField.firstIndex(of: player) {
+            playersOnField.remove(at: fieldIndex)
+            playerPositions.removeValue(forKey: playerID)
+        }
+        
+        // Remove from bench if on bench
+        if let benchIndex = playersOnBench.firstIndex(of: player) {
+            playersOnBench.remove(at: benchIndex)
+        }
+        
+        // Check if match can continue
+        if !validateMatchCanContinue() {
+            pauseTimer()
+            showValidationError("Match cannot continue - team has fewer than 7 players")
+        }
+        
+        showingRedCardSelector = false
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+    }
+    
+    // MARK: - Yellow Card System
+    
+    private func giveYellowCard(to player: Player) {
+        guard let playerID = player.id else { return }
+        
+        // Increment yellow card count
+        yellowCardedPlayers[playerID, default: 0] += 1
+        
+        // Check for second yellow card (= red card)
+        if yellowCardedPlayers[playerID, default: 0] >= 2 {
+            // Convert to red card
+            giveRedCard(to: player)
+            return
+        }
+        
+        showingYellowCardSelector = false
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+    }
+    
+    private var redCardSelectorView: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.primaryBackground
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    Text("Select Player for Red Card")
+                        .font(AppTheme.subheadFont)
+                        .foregroundColor(AppTheme.primaryText)
+                    
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(playersOnField + playersOnBench, id: \.objectID) { player in
+                                Button(action: {
+                                    giveRedCard(to: player)
+                                }) {
+                                    HStack {
+                                        playerTokenView(player: player, isOnField: playersOnField.contains(player))
+                                            .scaleEffect(0.8)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(player.name ?? "Unknown")
+                                                .font(AppTheme.bodyFont)
+                                                .foregroundColor(AppTheme.primaryText)
+                                            
+                                            Text("#\(player.jerseyNumber) - \(playersOnField.contains(player) ? "On Field" : "On Bench")")
+                                                .font(.caption)
+                                                .foregroundColor(AppTheme.secondaryText)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "rectangle.fill")
+                                            .foregroundColor(.red)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(AppTheme.secondaryBackground)
+                                    .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Red Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        showingRedCardSelector = false
+                    }
+                    .foregroundColor(AppTheme.secondaryText)
+                }
+            }
+        }
+    }
+    
+    private var yellowCardSelectorView: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.primaryBackground
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    Text("Select Player for Yellow Card")
+                        .font(AppTheme.subheadFont)
+                        .foregroundColor(AppTheme.primaryText)
+                    
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(playersOnField + playersOnBench, id: \.objectID) { player in
+                                Button(action: {
+                                    giveYellowCard(to: player)
+                                }) {
+                                    HStack {
+                                        playerTokenView(player: player, isOnField: playersOnField.contains(player))
+                                            .scaleEffect(0.8)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(player.name ?? "Unknown")
+                                                .font(AppTheme.bodyFont)
+                                                .foregroundColor(AppTheme.primaryText)
+                                            
+                                            HStack {
+                                                let playerLocation = playersOnField.contains(player) ? "On Field" : "On Bench"
+                                                Text("#\(player.jerseyNumber) - \(playerLocation)")
+                                                    .font(.caption)
+                                                    .foregroundColor(AppTheme.secondaryText)
+                                                
+                                                if let playerID = player.id,
+                                                   let yellowCards = yellowCardedPlayers[playerID],
+                                                   yellowCards > 0 {
+                                                    let cardText = yellowCards > 1 ? "s" : ""
+                                                    Text("(\(yellowCards) yellow\(cardText))")
+                                                        .font(.caption)
+                                                        .foregroundColor(.yellow)
+                                                }
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "rectangle.fill")
+                                            .foregroundColor(.yellow)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(AppTheme.secondaryBackground)
+                                    .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Yellow Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        showingYellowCardSelector = false
+                    }
+                    .foregroundColor(AppTheme.secondaryText)
+                }
+            }
+        }
     }
     
     

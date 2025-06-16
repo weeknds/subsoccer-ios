@@ -125,7 +125,7 @@ struct PlayerComparisonView: View {
                 selectedValue: getPlayerStats(for: selectedPlayer).totalGoals,
                 comparisonValue: getPlayerStats(for: comparisonPlayer).totalGoals,
                 color: AppTheme.accentColor,
-                icon: "soccer.ball"
+                icon: "soccerball"
             )
             
             // Assists comparison

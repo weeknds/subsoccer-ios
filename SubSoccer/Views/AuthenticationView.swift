@@ -124,6 +124,7 @@ struct AuthenticationView: View {
             )
             .signInWithAppleButtonStyle(.black)
             .frame(height: 50)
+            .frame(maxWidth: 350)
             .padding(.horizontal, AppTheme.largePadding)
             .disabled(isLoading)
             
@@ -256,6 +257,7 @@ struct AuthenticationView: View {
             )
             .signInWithAppleButtonStyle(.black)
             .frame(height: 50)
+            .frame(maxWidth: 350)
             .padding(.horizontal, AppTheme.largePadding)
             .disabled(isLoading)
             
@@ -476,6 +478,8 @@ struct AuthenticationView: View {
                     errorMessage = "Apple Sign-In not handled. Please try again."
                 case .unknown:
                     errorMessage = "Unknown error occurred. Please try again."
+                case .notInteractive:
+                    errorMessage = "Apple Sign-In requires user interaction. Please try again."
                 @unknown default:
                     errorMessage = "Apple Sign-In failed. Please try again."
                 }

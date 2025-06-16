@@ -54,14 +54,14 @@ struct ExportOptionsView: View {
                 Spacer()
             }
             .padding()
-            .background(Color.black)
+            .background(AppTheme.primaryBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.accent)
+                    .foregroundColor(.accentColor)
                 }
             }
         }
@@ -151,7 +151,7 @@ struct ExportOptionsView: View {
             HStack {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundColor(.accent)
+                    .foregroundColor(.accentColor)
                     .frame(width: 30)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -168,7 +168,7 @@ struct ExportOptionsView: View {
                 if isExporting {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(.accent)
+                        .tint(.accentColor)
                 } else {
                     Image(systemName: "chevron.right")
                         .foregroundColor(.gray)

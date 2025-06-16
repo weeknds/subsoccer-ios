@@ -220,7 +220,7 @@ struct MatchHistoryCard: View {
             
             // Stats summary
             HStack(spacing: 24) {
-                StatItem(icon: "soccer.ball", value: "\(totalGoals)", label: "Goals")
+                StatItem(icon: "soccerball", value: "\(totalGoals)", label: "Goals")
                 StatItem(icon: "hand.thumbsup", value: "\(totalAssists)", label: "Assists")
                 StatItem(icon: "person.3", value: "\(match.playerStatsArray.count)", label: "Players")
             }
@@ -421,7 +421,7 @@ struct MatchDetailView: View {
                 MatchHistoryStatCard(
                     title: "Total Goals",
                     value: "\(totalGoals)",
-                    icon: "soccer.ball",
+                    icon: "soccerball",
                     color: AppTheme.accentColor
                 )
                 

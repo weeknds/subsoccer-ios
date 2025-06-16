@@ -1,0 +1,90 @@
+/* Main Navigation */
+"teams" = "Lag";
+"matches" = "Matcher";
+"calendar" = "Kalender";
+"settings" = "Inställningar";
+
+/* Teams */
+"teams_title" = "Lag";
+"no_teams_yet" = "Inga Lag Än";
+"no_teams_description" = "Skapa ditt första lag för att komma igång med att hantera spelare och matcher";
+"add_team" = "Lägg Till Lag";
+"edit_team" = "Redigera Lag";
+"delete_team" = "Ta Bort Lag";
+"team_name" = "Lagnamn";
+"enter_team_name" = "Ange lagnamn";
+"new_team" = "Nytt Lag";
+"team_details" = "Lagdetaljer";
+"manage_players" = "Hantera Spelare";
+"manage_players_description" = "Lägg till, redigera och organisera lagspelare";
+"created" = "Skapad";
+"players_count" = "%d spelare";
+
+/* Players */
+"players_title" = "%@ Spelare";
+"no_players_yet" = "Inga Spelare Än";
+"no_players_description" = "Lägg till din första spelare för att komma igång";
+"no_players_found" = "Inga Spelare Hittades";
+"search_adjustment" = "Försök justera dina söktermer";
+"search_players_placeholder" = "Sök spelare...";
+"add_player" = "Lägg Till Spelare";
+"edit_player" = "Redigera Spelare";
+"delete_player" = "Ta Bort Spelare";
+"new_player" = "Ny Spelare";
+"player_name" = "Spelarnamn";
+"enter_player_name" = "Ange spelarnamn";
+"jersey_number" = "Tröjnummer";
+"position" = "Position";
+"goalkeeper" = "Målvakt";
+"defender" = "Försvarare";
+"midfielder" = "Mittfältare";
+"forward" = "Anfallare";
+"add_photo" = "Lägg Till Foto";
+"change_photo" = "Ändra Foto";
+"unnamed_player" = "Namnlös Spelare";
+"no_position" = "Ingen Position";
+"player_details" = "Spelardetaljer";
+"unknown_player" = "Okänd Spelare";
+
+/* Positions Short */
+"position_gk" = "MV";
+"position_def" = "FÖRS";
+"position_mid" = "MITT";
+"position_fwd" = "ANF";
+
+/* Statistics */
+"goals" = "Mål";
+"assists" = "Assist";
+"matches" = "Matcher";
+"minutes" = "Minuter";
+"all_time" = "All Tid";
+"last_month" = "Senaste Månaden";
+"last_week" = "Senaste Veckan";
+"recent_matches" = "Senaste Matcher";
+"no_matches_played" = "Inga matcher spelade än";
+
+/* Common Actions */
+"cancel" = "Avbryt";
+"save" = "Spara";
+"done" = "Klar";
+"edit" = "Redigera";
+"delete" = "Ta Bort";
+"add" = "Lägg Till";
+"loading" = "Laddar...";
+"loading_players" = "Laddar spelare...";
+"loading_more" = "Laddar fler spelare...";
+
+/* Accessibility */
+"teams_tab_hint" = "Navigera till laghantering";
+"matches_tab_hint" = "Navigera till matchhantering";
+"calendar_tab_hint" = "Navigera till träningskalender";
+"settings_tab_hint" = "Navigera till appinställningar";
+"add_new_item" = "Lägg till nytt objekt";
+"add_team_hint" = "Dubbeltryck för att skapa ett nytt lag";
+"chevron_right" = "Visa detaljer";
+
+/* Error Messages */
+"error_deleting_team" = "Fel vid borttagning av lag";
+"error_deleting_player" = "Fel vid borttagning av spelare";
+"error_saving_team" = "Fel vid sparande av lag";
+"error_saving_player" = "Fel vid sparande av spelare";

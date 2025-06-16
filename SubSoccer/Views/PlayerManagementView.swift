@@ -5,32 +5,22 @@ import PhotosUI
 struct PlayerManagementView: View {
     let team: Team
     @Environment(\.managedObjectContext) private var viewContext
-    @FetchRequest private var players: FetchedResults<Player>
+    @StateObject private var optimizationService = DataOptimizationService.shared
     
     @State private var showingAddPlayer = false
     @State private var selectedPlayer: Player?
     @State private var searchText = ""
     @State private var showingInjuryManagement = false
     
-    init(team: Team) {
-        self.team = team
-        self._players = FetchRequest(
-            sortDescriptors: [NSSortDescriptor(keyPath: \Player.jerseyNumber, ascending: true)],
-            predicate: NSPredicate(format: "team == %@", team),
-            animation: .default
-        )
-    }
+    // Lazy loading state
+    @State private var players: [Player] = []
+    @State private var isLoading = false
+    @State private var hasMorePlayers = true
+    @State private var currentOffset = 0
+    private let pageSize = 20
     
     var filteredPlayers: [Player] {
-        if searchText.isEmpty {
-            return Array(players)
-        } else {
-            return players.filter { player in
-                (player.name?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                String(player.jerseyNumber).contains(searchText) ||
-                (player.position?.localizedCaseInsensitiveContains(searchText) ?? false)
-            }
-        }
+        return players
     }
     
     var body: some View {
@@ -44,12 +34,19 @@ struct PlayerManagementView: View {
                         .padding(.horizontal, AppTheme.largePadding)
                         .padding(.top, AppTheme.standardPadding)
                     
-                    if filteredPlayers.isEmpty {
+                    if isLoading && players.isEmpty {
+                        ProgressView("Loading players...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .foregroundColor(AppTheme.secondaryText)
+                    } else if filteredPlayers.isEmpty {
                         EmptyPlayersView(hasPlayers: !players.isEmpty)
                     } else {
-                        PlayersListView(
+                        OptimizedPlayersListView(
                             players: filteredPlayers,
-                            selectedPlayer: $selectedPlayer
+                            selectedPlayer: $selectedPlayer,
+                            isLoading: $isLoading,
+                            hasMorePlayers: hasMorePlayers,
+                            onLoadMore: loadMorePlayers
                         )
                     }
                 }
@@ -66,7 +63,7 @@ struct PlayerManagementView: View {
                     }
                 }
             }
-            .navigationTitle("\(team.name ?? "Team") Players")
+            .navigationTitle(LocalizationKeys.playersTitle.localized(with: team.name ?? LocalizationKeys.teams.localized))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -87,6 +84,81 @@ struct PlayerManagementView: View {
             .sheet(isPresented: $showingInjuryManagement) {
                 InjuryManagementView(team: team)
             }
+            .task {
+                await loadInitialPlayers()
+            }
+            .onChange(of: searchText) { _, newValue in
+                Task {
+                    await searchPlayers(searchText: newValue)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Data Loading Methods
+    
+    private func loadInitialPlayers() async {
+        isLoading = true
+        currentOffset = 0
+        hasMorePlayers = true
+        
+        let newPlayers = await optimizationService.fetchPaginatedPlayers(
+            for: team,
+            searchText: searchText,
+            offset: 0,
+            limit: pageSize
+        )
+        
+        await MainActor.run {
+            players = newPlayers
+            currentOffset = pageSize
+            hasMorePlayers = newPlayers.count == pageSize
+            isLoading = false
+        }
+    }
+    
+    private func loadMorePlayers() {
+        guard !isLoading && hasMorePlayers else { return }
+        
+        Task {
+            isLoading = true
+            
+            let newPlayers = await optimizationService.fetchPaginatedPlayers(
+                for: team,
+                searchText: searchText,
+                offset: currentOffset,
+                limit: pageSize
+            )
+            
+            await MainActor.run {
+                players.append(contentsOf: newPlayers)
+                currentOffset += pageSize
+                hasMorePlayers = newPlayers.count == pageSize
+                isLoading = false
+            }
+        }
+    }
+    
+    private func searchPlayers(searchText: String) async {
+        isLoading = true
+        currentOffset = 0
+        hasMorePlayers = true
+        
+        // Add a small delay to avoid too many requests while typing
+        try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+        
+        let newPlayers = await optimizationService.fetchPaginatedPlayers(
+            for: team,
+            searchText: searchText,
+            offset: 0,
+            limit: pageSize * 2 // Load more for search results
+        )
+        
+        await MainActor.run {
+            players = newPlayers
+            currentOffset = pageSize * 2
+            hasMorePlayers = newPlayers.count == pageSize * 2
+            isLoading = false
         }
     }
 }
@@ -100,7 +172,7 @@ struct SearchBar: View {
                 .foregroundColor(AppTheme.secondaryText)
                 .font(.system(size: 16))
             
-            TextField("Search players...", text: $text)
+            TextField(LocalizationKeys.searchPlayersPlaceholder.localized, text: $text)
                 .font(AppTheme.bodyFont)
                 .foregroundColor(AppTheme.primaryText)
             
@@ -128,12 +200,12 @@ struct EmptyPlayersView: View {
                 .foregroundColor(AppTheme.accentColor)
                 .padding(.bottom, 20)
             
-            Text(hasPlayers ? "No Players Found" : "No Players Yet")
+            Text(hasPlayers ? LocalizationKeys.noPlayersFound.localized : LocalizationKeys.noPlayersYet.localized)
                 .font(AppTheme.titleFont)
                 .foregroundColor(AppTheme.primaryText)
                 .padding(.bottom, 8)
             
-            Text(hasPlayers ? "Try adjusting your search terms" : "Add your first player to get started")
+            Text(hasPlayers ? LocalizationKeys.searchAdjustment.localized : LocalizationKeys.noPlayersDescription.localized)
                 .font(AppTheme.bodyFont)
                 .foregroundColor(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -143,16 +215,21 @@ struct EmptyPlayersView: View {
     }
 }
 
-struct PlayersListView: View {
+struct OptimizedPlayersListView: View {
     let players: [Player]
     @Binding var selectedPlayer: Player?
+    @Binding var isLoading: Bool
+    let hasMorePlayers: Bool
+    let onLoadMore: () -> Void
+    
     @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var optimizationService = DataOptimizationService.shared
     
     var body: some View {
         ScrollView {
             LazyVStack(spacing: AppTheme.standardPadding) {
-                ForEach(players, id: \.self) { player in
-                    PlayerCard(player: player) {
+                ForEach(Array(players.enumerated()), id: \.element) { index, player in
+                    OptimizedPlayerCard(player: player) {
                         selectedPlayer = player
                     }
                     .contextMenu {
@@ -172,6 +249,23 @@ struct PlayersListView: View {
                         }
                         .tint(AppTheme.accentColor)
                     }
+                    .onAppear {
+                        // Load more when approaching the end
+                        if index == players.count - 3 && hasMorePlayers && !isLoading {
+                            onLoadMore()
+                        }
+                    }
+                }
+                
+                if isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading more players...")
+                            .font(AppTheme.captionFont)
+                            .foregroundColor(AppTheme.secondaryText)
+                    }
+                    .padding()
                 }
             }
             .padding(.horizontal, AppTheme.largePadding)
@@ -193,17 +287,17 @@ struct PlayersListView: View {
     }
 }
 
-struct PlayerCard: View {
+struct OptimizedPlayerCard: View {
     let player: Player
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: AppTheme.largePadding) {
-                PlayerAvatar(player: player, size: 50)
+                OptimizedPlayerAvatar(player: player, size: 50)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(player.name ?? "Unnamed Player")
+                    Text(player.name ?? LocalizationKeys.unnamedPlayer.localized)
                         .font(AppTheme.titleFont)
                         .foregroundColor(AppTheme.primaryText)
                         .lineLimit(1)
@@ -221,6 +315,12 @@ struct PlayerCard: View {
                         Text(player.position ?? "No Position")
                             .font(AppTheme.captionFont)
                             .foregroundColor(AppTheme.secondaryText)
+                        
+                        if player.isInjured {
+                            Image(systemName: "bandage")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
                     }
                 }
                 
@@ -238,15 +338,21 @@ struct PlayerCard: View {
     }
 }
 
-struct PlayerAvatar: View {
+struct OptimizedPlayerAvatar: View {
     let player: Player
     let size: CGFloat
     
+    @StateObject private var optimizationService = DataOptimizationService.shared
+    @State private var image: UIImage?
+    
+    private var cacheKey: String {
+        player.objectID.uriRepresentation().absoluteString
+    }
+    
     var body: some View {
         Group {
-            if let imageData = player.profileImageData,
-               let uiImage = UIImage(data: imageData) {
-                Image(uiImage: uiImage)
+            if let image = image {
+                Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
@@ -258,6 +364,34 @@ struct PlayerAvatar: View {
         .frame(width: size, height: size)
         .background(AppTheme.secondaryBackground)
         .clipShape(Circle())
+        .task {
+            await loadImage()
+        }
+    }
+    
+    private func loadImage() async {
+        guard let imageData = player.profileImageData else { return }
+        
+        let targetSize = CGSize(width: size * 2, height: size * 2) // 2x for retina
+        let loadedImage = optimizationService.loadOptimizedImage(
+            from: imageData,
+            cacheKey: cacheKey,
+            targetSize: targetSize
+        )
+        
+        await MainActor.run {
+            image = loadedImage
+        }
+    }
+}
+
+// Keep the original PlayerAvatar for compatibility
+struct PlayerAvatar: View {
+    let player: Player
+    let size: CGFloat
+    
+    var body: some View {
+        OptimizedPlayerAvatar(player: player, size: size)
     }
 }
 
@@ -349,7 +483,8 @@ struct AddEditPlayerView: View {
             .onChange(of: selectedPhoto) { _, newPhoto in
                 Task {
                     if let data = try? await newPhoto?.loadTransferable(type: Data.self) {
-                        profileImageData = data
+                        // Compress image data before storing
+                        profileImageData = DataOptimizationService.shared.compressImageData(data)
                     }
                 }
             }
@@ -381,12 +516,14 @@ struct PhotoPickerSection: View {
     @Binding var selectedPhoto: PhotosPickerItem?
     @Binding var profileImageData: Data?
     
+    @StateObject private var optimizationService = DataOptimizationService.shared
+    @State private var displayImage: UIImage?
+    
     var body: some View {
         VStack(spacing: AppTheme.standardPadding) {
             Group {
-                if let imageData = profileImageData,
-                   let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
+                if let image = displayImage {
+                    Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else {
@@ -398,6 +535,12 @@ struct PhotoPickerSection: View {
             .frame(width: 100, height: 100)
             .background(AppTheme.secondaryBackground)
             .clipShape(Circle())
+            .onChange(of: profileImageData) { _, newData in
+                updateDisplayImage(from: newData)
+            }
+            .onAppear {
+                updateDisplayImage(from: profileImageData)
+            }
             
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 Text(profileImageData == nil ? "Add Photo" : "Change Photo")
@@ -409,6 +552,20 @@ struct PhotoPickerSection: View {
                     .cornerRadius(AppTheme.cornerRadius)
             }
         }
+    }
+    
+    private func updateDisplayImage(from data: Data?) {
+        guard let data = data else {
+            displayImage = nil
+            return
+        }
+        
+        let targetSize = CGSize(width: 200, height: 200)
+        displayImage = optimizationService.loadOptimizedImage(
+            from: data,
+            cacheKey: "photo_picker_\(data.hashValue)",
+            targetSize: targetSize
+        )
     }
 }
 
@@ -587,7 +744,7 @@ struct PlayerDetailView: View {
             StatCard(
                 title: "Goals",
                 value: "\(playerStats.totalGoals)",
-                icon: "soccer.ball",
+                icon: "soccerball",
                 color: AppTheme.accentColor
             )
             

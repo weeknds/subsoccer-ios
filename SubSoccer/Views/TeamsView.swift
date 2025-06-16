@@ -49,22 +49,41 @@ struct TeamsView: View {
 
 struct EmptyTeamsView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "person.3.fill")
-                .font(.system(size: 60))
-                .foregroundColor(AppTheme.accentColor)
-                .padding(.bottom, 20)
+        VStack(spacing: 24) {
+            // Modern icon with background circle
+            ZStack {
+                Circle()
+                    .fill(AppTheme.accentColor.opacity(0.1))
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: "person.3.fill")
+                    .font(.system(size: 48, weight: .medium))
+                    .foregroundColor(AppTheme.accentColor)
+            }
             
-            Text("No Teams Yet")
-                .font(AppTheme.titleFont)
-                .foregroundColor(AppTheme.primaryText)
-                .padding(.bottom, 8)
+            VStack(spacing: 12) {
+                Text("No Teams Yet")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.primaryText)
+                
+                Text("Create your first team to get started with managing players and matches")
+                    .font(AppTheme.bodyFont)
+                    .foregroundColor(AppTheme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
             
-            Text("Create your first team to get started with managing players and matches")
-                .font(AppTheme.bodyFont)
-                .foregroundColor(AppTheme.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            // Call to action hint
+            VStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(AppTheme.accentColor)
+                
+                Text("Tap the + button to create a team")
+                    .font(AppTheme.captionFont)
+                    .foregroundColor(AppTheme.secondaryText)
+            }
+            .padding(.top, 20)
         }
     }
 }
@@ -123,44 +142,99 @@ struct TeamCard: View {
     let team: Team
     let onTap: () -> Void
     
+    private var playerCount: Int {
+        team.players?.count ?? 0
+    }
+    
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: AppTheme.standardPadding) {
-                HStack {
+            VStack(spacing: 0) {
+                // Main content
+                HStack(spacing: 16) {
+                    // Team icon
+                    ZStack {
+                        Circle()
+                            .fill(AppTheme.accentColor.opacity(0.1))
+                            .frame(width: 48, height: 48)
+                        
+                        Image(systemName: "shield.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(AppTheme.accentColor)
+                    }
+                    
+                    // Team info
                     VStack(alignment: .leading, spacing: 4) {
                         Text(team.name ?? "Unnamed Team")
-                            .font(AppTheme.titleFont)
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
                             .foregroundColor(AppTheme.primaryText)
                             .lineLimit(1)
                         
-                        Text("\(team.players?.count ?? 0) players")
-                            .font(AppTheme.captionFont)
-                            .foregroundColor(AppTheme.secondaryText)
+                        HStack(spacing: 16) {
+                            Label("\(playerCount)", systemImage: "person.2.fill")
+                                .font(AppTheme.captionFont)
+                                .foregroundColor(AppTheme.secondaryText)
+                            
+                            if let createdAt = team.createdAt {
+                                Text("Created \(createdAt, style: .date)")
+                                    .font(AppTheme.captionFont)
+                                    .foregroundColor(AppTheme.secondaryText)
+                            }
+                        }
                     }
                     
                     Spacer()
                     
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(AppTheme.secondaryText)
+                    // Chevron with background
+                    ZStack {
+                        Circle()
+                            .fill(AppTheme.secondaryBackground)
+                            .frame(width: 32, height: 32)
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.accentColor)
+                    }
                 }
+                .padding(20)
                 
-                if let createdAt = team.createdAt {
-                    Text("Created \(createdAt, style: .date)")
-                        .font(AppTheme.captionFont)
-                        .foregroundColor(AppTheme.secondaryText)
+                // Progress bar for player capacity (optional visual element)
+                if playerCount > 0 {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Squad Size")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(AppTheme.secondaryText)
+                            
+                            Spacer()
+                            
+                            Text("\(playerCount)/25")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppTheme.accentColor)
+                        }
+                        
+                        ProgressView(value: Double(playerCount), total: 25.0)
+                            .tint(AppTheme.accentColor)
+                            .scaleEffect(y: 0.5)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
                 }
             }
-            .padding(AppTheme.largePadding)
             .background(AppTheme.secondaryBackground)
-            .cornerRadius(AppTheme.cornerRadius)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(AppTheme.accentColor.opacity(0.1), lineWidth: 1)
+            )
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }
 
 struct FloatingActionButton: View {
     let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     
     var body: some View {
         Button(action: action) {
@@ -172,8 +246,11 @@ struct FloatingActionButton: View {
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
         }
+        .accessibilityLabel("Add new item")
+        .accessibilityHint("Double tap to create a new team")
+        .accessibilityAddTraits(.isButton)
         .scaleEffect(1.0)
-        .animation(.easeInOut(duration: 0.1), value: false)
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.1), value: false)
     }
 }
 
@@ -332,5 +409,27 @@ struct TeamDetailView: View {
                 PlayerManagementView(team: team)
             }
         }
+    }
+}
+
+struct TeamSelectionPlaceholder: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 64))
+                .foregroundColor(AppTheme.secondaryText)
+            
+            Text("Select a Team")
+                .font(AppTheme.headerFont)
+                .foregroundColor(AppTheme.primaryText)
+            
+            Text("Choose a team from the sidebar to view its details and manage players")
+                .font(AppTheme.bodyFont)
+                .foregroundColor(AppTheme.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.primaryBackground)
     }
 }

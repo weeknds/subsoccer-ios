@@ -70,22 +70,41 @@ struct MatchesView: View {
     }
     
     private var emptyStateView: some View {
-        VStack {
-            Image(systemName: "sportscourt.fill")
-                .font(.system(size: 60))
-                .foregroundColor(AppTheme.accentColor)
-                .padding(.bottom, 20)
+        VStack(spacing: 24) {
+            // Modern icon with background circle
+            ZStack {
+                Circle()
+                    .fill(AppTheme.accentColor.opacity(0.1))
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: "sportscourt.fill")
+                    .font(.system(size: 48, weight: .medium))
+                    .foregroundColor(AppTheme.accentColor)
+            }
             
-            Text("No Matches Yet")
-                .font(AppTheme.headerFont)
-                .foregroundColor(AppTheme.primaryText)
-                .padding(.bottom, 8)
+            VStack(spacing: 12) {
+                Text("No Matches Yet")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.primaryText)
+                
+                Text("Set up your first match to start tracking live games and substitutions")
+                    .font(AppTheme.bodyFont)
+                    .foregroundColor(AppTheme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
             
-            Text("Set up your first match to start tracking live games and substitutions")
-                .font(AppTheme.bodyFont)
-                .foregroundColor(AppTheme.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            // Call to action hint
+            VStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(AppTheme.accentColor)
+                
+                Text("Tap the + button to set up a match")
+                    .font(AppTheme.captionFont)
+                    .foregroundColor(AppTheme.secondaryText)
+            }
+            .padding(.top, 20)
             
             Spacer()
         }
@@ -134,14 +153,33 @@ struct MatchCard: View {
         return formatter
     }
     
+    private var isUpcoming: Bool {
+        guard let matchDate = match.date else { return false }
+        return matchDate > Date()
+    }
+    
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+            VStack(spacing: 0) {
+                // Header with team and date
+                HStack(spacing: 16) {
+                    // Match icon
+                    ZStack {
+                        Circle()
+                            .fill(isUpcoming ? AppTheme.accentColor.opacity(0.1) : AppTheme.secondaryText.opacity(0.1))
+                            .frame(width: 48, height: 48)
+                        
+                        Image(systemName: isUpcoming ? "clock.fill" : "sportscourt.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(isUpcoming ? AppTheme.accentColor : AppTheme.secondaryText)
+                    }
+                    
+                    // Match info
                     VStack(alignment: .leading, spacing: 4) {
                         Text(match.team?.name ?? "Unknown Team")
-                            .font(AppTheme.subheadFont)
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
                             .foregroundColor(AppTheme.primaryText)
+                            .lineLimit(1)
                         
                         Text(dateFormatter.string(from: match.date ?? Date()))
                             .font(AppTheme.captionFont)
@@ -150,36 +188,83 @@ struct MatchCard: View {
                     
                     Spacer()
                     
+                    // Status indicator
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text("\(match.duration) min")
-                            .font(AppTheme.captionFont)
-                            .foregroundColor(AppTheme.accentColor)
+                        Text(isUpcoming ? "UPCOMING" : "READY")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(isUpcoming ? AppTheme.accentColor : .orange)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(isUpcoming ? AppTheme.accentColor.opacity(0.1) : Color.orange.opacity(0.1))
+                            )
                         
-                        Text("\(match.numberOfHalves) halves")
-                            .font(AppTheme.captionFont)
-                            .foregroundColor(AppTheme.secondaryText)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.accentColor)
                     }
                 }
+                .padding(20)
                 
-                HStack {
-                    Label("Start Match", systemImage: "play.fill")
-                        .font(AppTheme.captionFont)
-                        .foregroundColor(AppTheme.accentColor)
+                // Match details
+                HStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Duration")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.secondaryText)
+                        Text("\(match.duration) min")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppTheme.primaryText)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Halves")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.secondaryText)
+                        Text("\(match.numberOfHalves)")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppTheme.primaryText)
+                    }
+                    
+                    if match.hasOvertime {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Overtime")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(AppTheme.secondaryText)
+                            Text("Enabled")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(AppTheme.accentColor)
+                        }
+                    }
                     
                     Spacer()
                     
-                    if match.hasOvertime {
-                        Text("Overtime Enabled")
-                            .font(AppTheme.captionFont)
-                            .foregroundColor(AppTheme.secondaryText)
+                    // Play button
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Start Match")
+                            .font(.system(size: 14, weight: .semibold))
                     }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(AppTheme.accentColor)
+                    .cornerRadius(20)
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
-            .padding()
             .background(AppTheme.secondaryBackground)
-            .cornerRadius(AppTheme.cornerRadius)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(AppTheme.accentColor.opacity(0.1), lineWidth: 1)
+            )
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }
 

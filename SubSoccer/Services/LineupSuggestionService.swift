@@ -100,7 +100,7 @@ class LineupSuggestionService: ObservableObject {
     
     private func calculatePlaytimeScore(player: Player) -> Double {
         let stats = player.statistics as? Set<PlayerStats> ?? []
-        let totalMinutes = stats.reduce(0) { $0 + Int($1.minutesPlayed) }
+        let _ = stats.reduce(0) { $0 + Int($1.minutesPlayed) }
         let recentMatches = stats.filter { 
             guard let match = $0.match, let date = match.date else { return false }
             return date > Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
@@ -155,7 +155,7 @@ class LineupSuggestionService: ObservableObject {
         var lineup: [LineupPlayerPosition] = []
         var usedPlayers: Set<Player> = []
         
-        let positionRequirements = formation.positionRequirements
+        let _ = formation.positionRequirements
         
         // First, assign specialized positions (GK)
         if let goalkeeper = playerScores.first(where: { $0.0.position == "GK" && !usedPlayers.contains($0.0) }) {
@@ -308,7 +308,7 @@ class LineupSuggestionService: ObservableObject {
         let players = (team.players as? Set<Player>)?.filter { !isInjured($0) } ?? []
         let playersByPosition = Dictionary(grouping: players) { $0.position ?? "MID" }
         
-        let goalkeepers = playersByPosition["GK"]?.count ?? 0
+        let _ = playersByPosition["GK"]?.count ?? 0
         let defenders = playersByPosition["DEF"]?.count ?? 0
         let midfielders = playersByPosition["MID"]?.count ?? 0
         let forwards = playersByPosition["FWD"]?.count ?? 0

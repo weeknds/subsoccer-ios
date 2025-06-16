@@ -96,14 +96,14 @@ struct PlayerStatisticsView: View {
     
     private var teamOverviewSection: some View {
         LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible())
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
         ], spacing: 16) {
             StatCard(
                 title: "Total Goals",
                 value: "\(totalGoals)",
-                icon: "soccer.ball",
+                icon: "soccerball",
                 color: AppTheme.accentColor
             )
             
@@ -323,7 +323,10 @@ struct StatCard: View {
                 .font(AppTheme.captionFont)
                 .foregroundColor(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, minHeight: 100)
         .padding()
         .background(AppTheme.secondaryBackground)
         .cornerRadius(12)

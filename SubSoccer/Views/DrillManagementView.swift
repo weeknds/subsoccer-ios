@@ -417,7 +417,7 @@ struct AddDrillView: View {
     }
     
     private var canAdd: Bool {
-        if let template = selectedTemplate {
+        if selectedTemplate != nil {
             return true
         }
         return !drillName.trimmingCharacters(in: .whitespaces).isEmpty

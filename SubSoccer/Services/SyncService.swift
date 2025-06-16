@@ -14,11 +14,22 @@ class SyncService: ObservableObject {
     private let supabaseService = SupabaseService.shared
     private var syncTimer: Timer?
     
-    enum SyncStatus {
+    enum SyncStatus: Equatable {
         case idle
         case syncing
         case completed
         case failed(Error)
+        
+        static func == (lhs: SyncStatus, rhs: SyncStatus) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle), (.syncing, .syncing), (.completed, .completed):
+                return true
+            case (.failed, .failed):
+                return true
+            default:
+                return false
+            }
+        }
         
         var description: String {
             switch self {
@@ -83,15 +94,15 @@ class SyncService: ObservableObject {
         do {
             // Step 1: Push local changes to Supabase
             syncProgress = 0.1
-            await pushLocalChanges()
+            try await pushLocalChanges()
             
             // Step 2: Pull remote changes from Supabase
             syncProgress = 0.5
-            await pullRemoteChanges()
+            try await pullRemoteChanges()
             
             // Step 3: Resolve conflicts if any
             syncProgress = 0.8
-            await resolveConflicts()
+            try await resolveConflicts()
             
             // Step 4: Complete sync
             syncProgress = 1.0
@@ -112,81 +123,71 @@ class SyncService: ObservableObject {
         }
     }
     
-    private func pushLocalChanges() async {
+    private func pushLocalChanges() async throws {
         // This would push all modified local entities to Supabase
         // For now, this is a placeholder implementation
         
-        do {
-            let context = PersistenceController.shared.container.viewContext
+        let context = PersistenceController.shared.container.viewContext
+        
+        // Push teams that need syncing
+        let teamFetch: NSFetchRequest<Team> = Team.fetchRequest()
+        teamFetch.predicate = NSPredicate(format: "needsSync == true OR lastSynced == nil")
+        
+        let teams = try context.fetch(teamFetch)
+        
+        for team in teams {
+            let remoteTeam = RemoteTeam(
+                id: team.id?.uuidString ?? UUID().uuidString,
+                name: team.name ?? "",
+                created_at: team.createdAt ?? Date(),
+                updated_at: Date(),
+                user_id: supabaseService.currentUser?.id.uuidString ?? ""
+            )
             
-            // Push teams that need syncing
-            let teamFetch: NSFetchRequest<Team> = Team.fetchRequest()
-            teamFetch.predicate = NSPredicate(format: "needsSync == true OR lastSynced == nil")
+            try await supabaseService.uploadTeam(remoteTeam)
             
-            let teams = try context.fetch(teamFetch)
-            
-            for team in teams {
-                let remoteTeam = RemoteTeam(
-                    id: team.id?.uuidString ?? UUID().uuidString,
-                    name: team.name ?? "",
-                    created_at: team.createdAt ?? Date(),
-                    updated_at: Date(),
-                    user_id: supabaseService.currentUser?.id.uuidString ?? ""
-                )
-                
-                try await supabaseService.uploadTeam(remoteTeam)
-                
-                // Mark as synced
-                team.setValue(false, forKey: "needsSync")
-                team.setValue(Date(), forKey: "lastSynced")
-            }
-            
-            try context.save()
-            
-        } catch {
-            throw SyncError.pushFailed(error)
+            // Mark as synced
+            team.setValue(false, forKey: "needsSync")
+            team.setValue(Date(), forKey: "lastSynced")
         }
+        
+        try context.save()
     }
     
-    private func pullRemoteChanges() async {
+    private func pullRemoteChanges() async throws {
         // This would pull all remote changes and update local Core Data
         // For now, this is a placeholder implementation
         
-        do {
-            let context = PersistenceController.shared.container.viewContext
+        let context = PersistenceController.shared.container.viewContext
+        
+        // Pull teams from Supabase
+        let remoteTeams = try await supabaseService.syncTeams()
+        
+        for remoteTeam in remoteTeams {
+            // Check if team exists locally
+            let teamFetch: NSFetchRequest<Team> = Team.fetchRequest()
+            teamFetch.predicate = NSPredicate(format: "id == %@", remoteTeam.id)
             
-            // Pull teams from Supabase
-            let remoteTeams = try await supabaseService.syncTeams()
+            let existingTeams = try context.fetch(teamFetch)
             
-            for remoteTeam in remoteTeams {
-                // Check if team exists locally
-                let teamFetch: NSFetchRequest<Team> = Team.fetchRequest()
-                teamFetch.predicate = NSPredicate(format: "id == %@", remoteTeam.id)
-                
-                let existingTeams = try context.fetch(teamFetch)
-                
-                let team: Team
-                if let existingTeam = existingTeams.first {
-                    team = existingTeam
-                } else {
-                    team = Team(context: context)
-                    team.id = UUID(uuidString: remoteTeam.id)
-                }
-                
-                team.name = remoteTeam.name
-                team.createdAt = remoteTeam.created_at
-                team.setValue(Date(), forKey: "lastSynced")
-                team.setValue(false, forKey: "needsSync")
+            let team: Team
+            if let existingTeam = existingTeams.first {
+                team = existingTeam
+            } else {
+                team = Team(context: context)
+                team.id = UUID(uuidString: remoteTeam.id)
             }
             
-            try context.save()
-            
-        } catch {
-            throw SyncError.pullFailed(error)
+            team.name = remoteTeam.name
+            team.createdAt = remoteTeam.created_at
+            team.setValue(Date(), forKey: "lastSynced")
+            team.setValue(false, forKey: "needsSync")
         }
+        
+        try context.save()
     }
     
-    private func resolveConflicts() async {
+    private func resolveConflicts() async throws {
         // Implement conflict resolution logic
         // For now, remote changes take precedence (last-write-wins)
         
